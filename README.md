@@ -2,7 +2,7 @@
 Repo to see if I am following Golang best practices. Standard Go http server
 
 ## Features
-1. INSERT and DELETE to MySQL.
+1. CRUD operations using standard MySQL library.
 2. Using default HTTP Server, Handler.
 3. Database rollback and commit.
 4. Integration and data access layer test.

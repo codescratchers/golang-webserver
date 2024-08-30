@@ -27,13 +27,32 @@ func ConnectToMySQL(user, password, addr, dbName string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	pingErr := db.Ping()
-	if pingErr != nil {
-		log.Fatal(pingErr)
+	if err := db.Ping(); err != nil {
+		log.Fatal(err)
 		return nil, err
 	}
 
 	log.Println("database connection established")
 
-	return db, err
+	return db, createTable(db)
+}
+
+func createTable(db *sql.DB) error {
+	query := `
+		CREATE TABLE IF NOT EXISTS user (
+			user_id BIGINT AUTO_INCREMENT NOT NULL UNIQUE,
+			fullname VARCHAR(100) NOT NULL,
+			email VARCHAR(100) NOT NULL UNIQUE,
+			PRIMARY KEY (user_id),
+			CONSTRAINT CK_fullname CHECK ( LENGTH(fullname) > 0 ),
+			CONSTRAINT CK_email CHECK ( LENGTH(email) > 0 )
+		);
+	`
+
+	if _, err := db.Exec(query); err != nil {
+		log.Fatal(err)
+		return err
+	}
+
+	return nil
 }

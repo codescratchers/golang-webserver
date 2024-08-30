@@ -53,7 +53,12 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
 				Message: "duplicate username",
 			},
 		)
-	} else if user, err := h.UserService.CreateUser(r.Context(), UserDto{Email: email, Fullname: fullname}); err != nil {
+		return
+	}
+
+	user, err := h.UserService.CreateUser(r.Context(), UserDto{Email: email, Fullname: fullname})
+
+	if err != nil {
 		constructErrorResponse(
 			w,
 			ErrorResponse{
@@ -61,11 +66,12 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
 				Message: fmt.Sprintf("%v", err),
 			},
 		)
-	} else {
-		w.WriteHeader(http.StatusCreated)
-		response, _ := json.Marshal(UserDto{Fullname: user.Fullname})
-		_, _ = w.Write(response)
+		return
 	}
+
+	w.WriteHeader(http.StatusCreated)
+	response, _ := json.Marshal(UserDto{Fullname: user.Fullname, Email: user.Email})
+	_, _ = w.Write(response)
 }
 
 func (h *UserHandler) userByEmail(w http.ResponseWriter, r *http.Request) {

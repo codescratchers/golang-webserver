@@ -12,7 +12,7 @@ import (
 var dbInstance *sql.DB
 
 func TestMain(m *testing.M) {
-	db, err := database.ConnectToMySQL("hushtabs", "hushtabs", "127.0.0.1:3306", "hushtabs_db")
+	db, err := database.ConnectToMySQL("demo", "demo", "127.0.0.1:3306", "demo_db")
 
 	if err != nil {
 		log.Fatal(err)

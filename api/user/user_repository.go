@@ -10,6 +10,7 @@ import (
 
 type IUserRepository interface {
 	Save(ctx context.Context, user User) (User, error)
+	UserByEmail(ctx context.Context, email string) (User, error)
 }
 
 type userRepository struct {
@@ -20,6 +21,47 @@ func NewUserRepository(db *sql.DB) IUserRepository {
 	return userRepository{db: db}
 }
 
+func (r userRepository) UserByEmail(ctx context.Context, email string) (User, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+
+	if err != nil {
+		return User{}, fmt.Errorf("tx begin %w", err)
+	}
+
+	var user User
+
+	err = database.DbTransaction(ctx, tx, func(context.Context) error {
+		if u, err := userByEmailTx(ctx, tx, email); err != nil {
+			return err
+		} else {
+			user = u
+			return nil
+		}
+	})
+
+	if err != nil {
+		return User{}, fmt.Errorf("user not found")
+	}
+
+	return user, nil
+}
+
+func userByEmailTx(ctx context.Context, tx *sql.Tx, email string) (User, error) {
+	var user User
+	row := tx.QueryRowContext(ctx, "SELECT * FROM user WHERE email = ?", email)
+
+	// scan the result into the User struct
+	if err := row.Scan(
+		&user.UserId,
+		&user.Fullname,
+		&user.Email,
+	); err != nil {
+		return User{}, err
+	}
+
+	return user, nil
+}
+
 func (r userRepository) Save(ctx context.Context, user User) (User, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 
@@ -27,13 +69,10 @@ func (r userRepository) Save(ctx context.Context, user User) (User, error) {
 		return User{}, fmt.Errorf("save user tx begin %w", err)
 	}
 
-	i := 0
 	var u = user
 	err = database.DbTransaction(ctx, tx, func(context.Context) error {
 		return saveTx(ctx, tx, &u)
 	})
-
-	log.Printf("i %v", i)
 
 	return u, err
 }
@@ -41,8 +80,9 @@ func (r userRepository) Save(ctx context.Context, user User) (User, error) {
 func saveTx(ctx context.Context, tx *sql.Tx, user *User) error {
 	result, err := tx.ExecContext(
 		ctx,
-		"INSERT INTO user (fullname) VALUES (?)",
+		"INSERT INTO user (fullname, email) VALUES (?, ?)",
 		user.Fullname,
+		user.Email,
 	)
 
 	if err != nil {

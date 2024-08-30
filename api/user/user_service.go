@@ -3,7 +3,8 @@ package user
 import "context"
 
 type IUserService interface {
-	CreateUser(ctx context.Context, fullname string) (User, error)
+	UserByEmail(ctx context.Context, email string) (User, error)
+	CreateUser(ctx context.Context, dto UserDto) (User, error)
 }
 
 type userService struct {
@@ -15,7 +16,10 @@ func NewUserService(r IUserRepository) IUserService {
 	return userService{UserRepository: r}
 }
 
-// CreateUser saves a User obj to the database if the email does not exist
-func (s userService) CreateUser(ctx context.Context, fullname string) (User, error) {
-	return s.UserRepository.Save(ctx, User{Fullname: fullname})
+func (s userService) UserByEmail(ctx context.Context, email string) (User, error) {
+	return s.UserRepository.UserByEmail(ctx, email)
+}
+
+func (s userService) CreateUser(ctx context.Context, dto UserDto) (User, error) {
+	return s.UserRepository.Save(ctx, User{Fullname: dto.Fullname, Email: dto.Email})
 }

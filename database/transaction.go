@@ -13,10 +13,5 @@ func DbTransaction(ctx context.Context, tx *sql.Tx, f func(context.Context) erro
 		}
 		return fmt.Errorf("f %w", err)
 	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("db commit %w", err)
-	}
-
-	return nil
+	return tx.Commit()
 }

@@ -64,5 +64,10 @@ func createTable(db *sql.DB) error {
 		);
 	`
 
+	if _, err := db.Exec(query); err != nil {
+		log.Fatal(err)
+		return err
+	}
+
 	return nil
 }

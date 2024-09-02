@@ -17,19 +17,20 @@ func NewApiServer(addr string, store database.Storage, mux *http.ServeMux) *ApiO
 	return &ApiObj{addr: addr, Storage: store, mux: mux}
 }
 
-func Serve(s *ApiObj) {
+func Serve(a *ApiObj) {
 	// register user handler -> service -> repository
-	user.RegisterUserRoutes(s.mux, user.UserHandler{
+	user.RegisterUserRoutes(a.mux, user.UserHandler{
 		UserService: user.NewUserService(
-			user.NewUserRepository(s.Storage.DB),
-			user.NewRoleRepository(s.Storage.DB),
+			a.Storage.DB,
+			user.NewUserRepository(),
+			user.NewRoleRepository(),
 		),
 	})
 
 	// start the server
-	log.Println("starting server on ", s.addr)
+	log.Println("starting server on ", a.addr)
 
-	if err := http.ListenAndServe(s.addr, s.mux); err != nil {
+	if err := http.ListenAndServe(a.addr, a.mux); err != nil {
 		log.Fatalf("server failed to start: %v", err)
 	}
 }

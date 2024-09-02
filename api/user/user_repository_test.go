@@ -1,7 +1,6 @@
 package user
 
 import (
-	"context"
 	"database/sql"
 	"github.com/codescratchers/golang-webserver/database"
 	"log"
@@ -31,7 +30,7 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func SetupTest(t *testing.T) *sql.Tx {
+func setupTest(t *testing.T) *sql.Tx {
 	tx, err := dbInstance.Begin()
 	if err != nil {
 		t.Fatalf("failed to start transaction: %v", err)
@@ -50,23 +49,23 @@ func SetupTest(t *testing.T) *sql.Tx {
 func TestSave_And_UserByEmail(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	userRepo := NewUserRepository()
 
 	t.Run("TestGivenEmailThatExist_ShouldReturnSaidUser", func(t *testing.T) {
 		t.Parallel()
-		tx := SetupTest(t)
+		tx := setupTest(t)
 
 		user := User{
 			Fullname: "Test User",
 			Email:    "demo@email.com",
 		}
 
-		if err := saveTx(ctx, tx, &user); err != nil {
+		if err := userRepo.Save(tx, &user); err != nil {
 			t.Errorf("%s", err)
 		}
 
 		// method to test
-		find, err := userByEmailTx(ctx, tx, user.Email)
+		find, err := userRepo.UserByEmail(tx, user.Email)
 
 		// assert
 		if err != nil {
@@ -78,10 +77,10 @@ func TestSave_And_UserByEmail(t *testing.T) {
 
 	t.Run("TestGivenEmail_ShouldReturnNoUser", func(t *testing.T) {
 		t.Parallel()
-		tx := SetupTest(t)
+		tx := setupTest(t)
 
 		// method to test
-		_, err := userByEmailTx(ctx, tx, "demo@email.com")
+		_, err := userRepo.UserByEmail(tx, "demo@email.com")
 
 		// assert
 		if err == nil {

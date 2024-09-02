@@ -31,7 +31,13 @@ func constructErrorResponse(w http.ResponseWriter, e ErrorResponse) {
 }
 
 func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
+	b := r.Body
+	if b == nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	body, err := io.ReadAll(b)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("%s", err), http.StatusBadRequest)
 		return
@@ -42,7 +48,7 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, fmt.Sprintf("%s", err), http.StatusBadRequest)
 		}
-	}(r.Body)
+	}(b)
 
 	var dto UserDto
 
@@ -74,7 +80,7 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.UserService.CreateUser(r.Context(), dto); err != nil {
+	if err := h.UserService.CreateUser(r.Context(), dto); err != nil {
 		constructErrorResponse(
 			w,
 			ErrorResponse{

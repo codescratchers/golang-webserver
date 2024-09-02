@@ -13,8 +13,8 @@ import (
 func TestCreateAndGetUser(t *testing.T) {
 	t.Parallel()
 
-	userRepository := NewUserRepository(dbInstance)
-	userHandler := UserHandler{UserService: NewUserService(userRepository, NewRoleRepository(dbInstance))}
+	userRepository := NewUserRepository()
+	userHandler := UserHandler{UserService: NewUserService(dbInstance, userRepository, NewRoleRepository())}
 
 	t.Run("should not save user as request body is missing", func(t *testing.T) {
 		t.Parallel()
@@ -28,7 +28,7 @@ func TestCreateAndGetUser(t *testing.T) {
 		}
 	})
 
-	t.Run("should save user", func(t *testing.T) {
+	t.Run("test saving and retrieving user by email", func(t *testing.T) {
 		t.Parallel()
 
 		user := UserDto{
@@ -53,12 +53,27 @@ func TestCreateAndGetUser(t *testing.T) {
 
 		if s := rec.Code; s != http.StatusCreated {
 			t.Errorf("given %v, expect %v", s, http.StatusCreated)
-			return
+		}
+
+		_, err = userRepository.UserByEmail(setupTest(t), user.Email)
+		if err != nil {
+			t.Errorf("user not saved")
+		}
+
+		// test retrieving user via api call
+		req, _ = http.NewRequest("GET", fmt.Sprintf("%s?email=%s", route, user.Email), nil)
+		rec = httptest.NewRecorder()
+
+		http.HandlerFunc(userHandler.userByEmail).ServeHTTP(rec, req)
+
+		if s := rec.Code; s != http.StatusOK {
+			t.Errorf("given %v, expect %v", s, http.StatusOK)
 		}
 	})
 
 	t.Run("should test db rollback behaviour when a bottom level query returns error", func(t *testing.T) {
 		t.Parallel()
+		tx := setupTest(t)
 
 		user := UserDto{
 			Fullname: "Rollback",
@@ -80,34 +95,13 @@ func TestCreateAndGetUser(t *testing.T) {
 		rec := httptest.NewRecorder()
 		http.HandlerFunc(userHandler.createUser).ServeHTTP(rec, req)
 
-		if s := rec.Code; s != http.StatusBadRequest {
-			t.Errorf("given %v, expect %v", s, http.StatusBadRequest)
+		if s := rec.Code; s != http.StatusInternalServerError {
+			t.Errorf("given %v, expect %v", s, http.StatusInternalServerError)
 		}
 
-		_, err = userRepository.UserByEmail(req.Context(), user.Email)
+		_, err = userRepository.UserByEmail(tx, user.Email)
 		if err == nil {
 			t.Errorf("top level rollback committed though bottom level context encountered an error")
-		}
-	})
-
-	t.Run("should retrieve user by email", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := context.Background()
-
-		// pre-save user
-		if _, err := userRepository.Save(ctx, User{Fullname: "John", Email: "john@email.com"}); err != nil {
-			t.Errorf("pre-save failed %s", err)
-			return
-		}
-
-		url := fmt.Sprintf("%s?email=%s", route, "john@email.com")
-		req, _ := http.NewRequest("GET", url, nil)
-		rec := httptest.NewRecorder()
-		http.HandlerFunc(userHandler.userByEmail).ServeHTTP(rec, req)
-
-		if s := rec.Code; s != http.StatusOK {
-			t.Errorf("given %v, expect %v", s, http.StatusOK)
 		}
 	})
 }

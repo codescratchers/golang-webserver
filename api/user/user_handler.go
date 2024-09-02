@@ -3,6 +3,7 @@ package user
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -30,48 +31,60 @@ func constructErrorResponse(w http.ResponseWriter, e ErrorResponse) {
 }
 
 func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
-	fullname := r.URL.Query().Get("fullname")
-	email := r.URL.Query().Get("email")
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("%s", err), http.StatusBadRequest)
+		return
+	}
 
-	if len(fullname) < 1 || len(email) < 1 {
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			http.Error(w, fmt.Sprintf("%s", err), http.StatusBadRequest)
+		}
+	}(r.Body)
+
+	var dto UserDto
+
+	if err = json.Unmarshal(body, &dto); err != nil {
+		http.Error(w, fmt.Sprintf("%s", err), http.StatusInternalServerError)
+		return
+	}
+
+	if len(dto.Fullname) < 1 || len(dto.Email) < 1 || len(dto.Role) < 1 {
 		constructErrorResponse(
 			w,
 			ErrorResponse{
 				Status:  http.StatusBadRequest,
-				Message: "please enter your fullname",
+				Message: "invalid request body",
 			},
 		)
 		return
 	}
 
 	// if email exist duplicate else if an error occurs save else successfully saved
-	if _, err := h.UserService.UserByEmail(r.Context(), email); err == nil {
+	if _, err := h.UserService.UserByEmail(r.Context(), dto.Email); err == nil {
 		constructErrorResponse(
 			w,
 			ErrorResponse{
 				Status:  http.StatusBadRequest,
-				Message: "duplicate username",
+				Message: "duplicate email",
 			},
 		)
 		return
 	}
 
-	user, err := h.UserService.CreateUser(r.Context(), UserDto{Email: email, Fullname: fullname})
-
-	if err != nil {
+	if _, err := h.UserService.CreateUser(r.Context(), dto); err != nil {
 		constructErrorResponse(
 			w,
 			ErrorResponse{
 				Status:  http.StatusInternalServerError,
-				Message: fmt.Sprintf("%v", err),
+				Message: fmt.Sprintf("%s", err),
 			},
 		)
-		return
+	} else {
+		w.WriteHeader(http.StatusCreated)
 	}
-
-	w.WriteHeader(http.StatusCreated)
-	response, _ := json.Marshal(UserDto{Fullname: user.Fullname, Email: user.Email})
-	_, _ = w.Write(response)
 }
 
 func (h *UserHandler) userByEmail(w http.ResponseWriter, r *http.Request) {

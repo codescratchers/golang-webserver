@@ -20,7 +20,10 @@ func NewApiServer(addr string, store database.Storage, mux *http.ServeMux) *ApiO
 func Serve(s *ApiObj) {
 	// register user handler -> service -> repository
 	user.RegisterUserRoutes(s.mux, user.UserHandler{
-		UserService: user.NewUserService(user.NewUserRepository(s.Storage.DB)),
+		UserService: user.NewUserService(
+			user.NewUserRepository(s.Storage.DB),
+			user.NewRoleRepository(s.Storage.DB),
+		),
 	})
 
 	// start the server

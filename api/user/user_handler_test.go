@@ -1,10 +1,10 @@
 package user
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,15 +13,13 @@ import (
 func TestCreateAndGetUser(t *testing.T) {
 	t.Parallel()
 
-	repo := NewUserRepository(dbInstance)
-	userHandler := UserHandler{UserService: NewUserService(repo)}
+	userRepository := NewUserRepository(dbInstance)
+	userHandler := UserHandler{UserService: NewUserService(userRepository, NewRoleRepository(dbInstance))}
 
-	t.Run("should not save user as fullname and email are missing", func(t *testing.T) {
+	t.Run("should not save user as request body is missing", func(t *testing.T) {
 		t.Parallel()
 
-		url := fmt.Sprintf("%s?fullname=%s&email=%s", route, "", "")
-
-		req, _ := http.NewRequest("POST", url, nil)
+		req, _ := http.NewRequest("POST", route, nil)
 		rec := httptest.NewRecorder()
 		http.HandlerFunc(userHandler.createUser).ServeHTTP(rec, req)
 
@@ -33,9 +31,18 @@ func TestCreateAndGetUser(t *testing.T) {
 	t.Run("should save user", func(t *testing.T) {
 		t.Parallel()
 
-		url := fmt.Sprintf("%s?fullname=%s&email=%s", route, "frank", "frank@email.com")
+		user := UserDto{
+			Fullname: "Franko",
+			Email:    "Franko@example.com",
+			Role:     USER,
+		}
 
-		req, err := http.NewRequestWithContext(context.Background(), "POST", url, nil)
+		body, err := json.Marshal(user)
+		if err != nil {
+			t.Fatalf("failed to marshal user: %v", err)
+		}
+
+		req, err := http.NewRequestWithContext(context.Background(), "POST", route, bytes.NewBuffer(body))
 
 		if err != nil {
 			t.Fatalf("failed to create request: %v", err)
@@ -48,19 +55,38 @@ func TestCreateAndGetUser(t *testing.T) {
 			t.Errorf("given %v, expect %v", s, http.StatusCreated)
 			return
 		}
+	})
 
-		var dto UserDto
+	t.Run("should test db rollback behaviour when a bottom level query returns error", func(t *testing.T) {
+		t.Parallel()
 
-		if b, err := io.ReadAll(rec.Body); err != nil {
-			t.Errorf("error reading rec body")
-			return
-		} else if err = json.Unmarshal(b, &dto); err != nil {
-			t.Errorf("error transforming body to UserDto")
-			return
+		user := UserDto{
+			Fullname: "Rollback",
+			Email:    "rollback@demo.com",
+			Role:     TEST,
 		}
 
-		if len(dto.Email) < 1 || len(dto.Fullname) < 1 {
-			t.Errorf("dto properties should not be empty")
+		body, err := json.Marshal(user)
+		if err != nil {
+			t.Fatalf("failed to marshal user: %v", err)
+		}
+
+		req, err := http.NewRequestWithContext(context.Background(), "POST", route, bytes.NewBuffer(body))
+
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
+
+		rec := httptest.NewRecorder()
+		http.HandlerFunc(userHandler.createUser).ServeHTTP(rec, req)
+
+		if s := rec.Code; s != http.StatusBadRequest {
+			t.Errorf("given %v, expect %v", s, http.StatusBadRequest)
+		}
+
+		_, err = userRepository.UserByEmail(req.Context(), user.Email)
+		if err == nil {
+			t.Errorf("top level rollback committed though bottom level context encountered an error")
 		}
 	})
 
@@ -70,7 +96,7 @@ func TestCreateAndGetUser(t *testing.T) {
 		ctx := context.Background()
 
 		// pre-save user
-		if _, err := repo.Save(ctx, User{Fullname: "John", Email: "john@email.com"}); err != nil {
+		if _, err := userRepository.Save(ctx, User{Fullname: "John", Email: "john@email.com"}); err != nil {
 			t.Errorf("pre-save failed %s", err)
 			return
 		}

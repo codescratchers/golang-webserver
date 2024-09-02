@@ -54,5 +54,15 @@ func createTable(db *sql.DB) error {
 		return err
 	}
 
+	query = `
+		CREATE TABLE IF NOT EXISTS role (
+		    role_id BIGINT AUTO_INCREMENT NOT NULL UNIQUE,
+			role ENUM('USER', 'ADMIN') DEFAULT 'USER' NOT NULL,
+			user_id BIGINT NOT NULL,
+			PRIMARY KEY (role_id),
+			CONSTRAINT FK_user_and_role FOREIGN KEY (user_id) REFERENCES user (user_id) ON DELETE RESTRICT
+		);
+	`
+
 	return nil
 }

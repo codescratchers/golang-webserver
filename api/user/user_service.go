@@ -3,7 +3,7 @@ package user
 import (
 	"context"
 	"database/sql"
-	"github.com/codescratchers/golang-webserver/database"
+	"github.com/codescratchers/golang-webserver/utils"
 )
 
 type IUserService interface {
@@ -28,7 +28,7 @@ func (s userService) UserByEmail(ctx context.Context, email string) (User, error
 		return User{}, err
 	}
 	var user User
-	err = database.DbTransaction(ctx, tx, func(ctx context.Context) error {
+	err = utils.DbTransaction(ctx, tx, func(ctx context.Context) error {
 		user, err = s.UserRepository.UserByEmail(tx, email)
 		return err
 	})
@@ -46,7 +46,7 @@ func (s userService) CreateUser(ctx context.Context, dto UserDto) error {
 		return err
 	}
 
-	return database.DbTransaction(ctx, tx, func(ctx context.Context) error {
+	return utils.DbTransaction(ctx, tx, func(ctx context.Context) error {
 		user := User{Fullname: dto.Fullname, Email: dto.Email}
 		if err := s.UserRepository.Save(tx, &user); err != nil {
 			return err
